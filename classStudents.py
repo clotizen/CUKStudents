@@ -1,10 +1,15 @@
-from flask import Flask, request, jsonify
 from bs4 import BeautifulSoup
+import time
 import requests
 import uuid
 import json
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+
+print("start")
 
 app = Flask(__name__)
+CORS(app)
 
 class catlog():
     def __init__(self):
@@ -46,10 +51,11 @@ class catlog():
         try:
             for i in range(len(json_data["DS_CURR_OPSB010"])):
                 if json_data["DS_CURR_OPSB010"][i]["sbjtNo"] == id and json_data["DS_CURR_OPSB010"][i]['clssNo'] == no:
-                    cnt = json_data["DS_CURR_OPSB010"][i]['tlsnAplyRcnt']  # 신청인원
-                    cnt2 = json_data["DS_CURR_OPSB010"][i]['tlsnLmtRcnt']  # 제한인원
-                    cnt3 = json_data["DS_CURR_OPSB010"][i]['sbjtKorNm']  # 과목명
-                    return cnt, cnt2, cnt3
+                    cnt = json_data["DS_CURR_OPSB010"][i]['tlsnAplyRcnt']
+                    cnt2 = json_data["DS_CURR_OPSB010"][i]['tlsnLmtRcnt']
+                    cnt3 = json_data["DS_CURR_OPSB010"][i]['sbjtKorNm']
+
+            return cnt, cnt2, cnt3
         except:
             return 'Error', 'Error', 'Error'
 
@@ -76,18 +82,59 @@ class catlog():
         return requests.post('https://uportal.catholic.ac.kr/stw/scsr/scoo/findOpsbOpenSubjectInq.json',
                              headers=headers, cookies=cookies, data=data).json()
 
-@app.route('/classStudents', methods=['GET'])
-def get_class_students():
-    try:
-        subj = request.args.get('subjNo')
-        no = request.args.get('classNo')
-        userId = request.args.get('userId')
-        userPw = request.args.get('userPw')
-        year = request.args.get('year')
-        semester = request.args.get('semester')
+    def hak(self):
+        html = self.req_login.text
+        soup = BeautifulSoup(html, 'html.parser')
+        csrf = soup.find('meta', {'id': '_csrf'}).get('content')
 
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:72.0) Gecko/20100101 Firefox/72.0',
+                   'Accept': 'application/json, text/javascript, */*; q=0.01',
+                   'X-CSRF-TOKEN': csrf,
+                   'Referer': 'https://uportal.catholic.ac.kr/portal/main.do',
+                   'Content-Type': 'application/json'
+                   }
+
+        cookies = {'UCUPS_PT_SESSION': self.session.cookies.get_dict()['UCUPS_PT_SESSION']}
+
+        data = {"sysDate": "2020.03.24(화)", "toDay": "20200324", "weekDay": 2, "yyyy": "2020", "MM": "03", "dd": "24"}
+
+        return requests.post('https://uportal.catholic.ac.kr/portal/portlet/P018/listData.ajax',
+                             headers=headers, cookies=cookies, data=json.dumps(data)).json()
+
+
+@app.route('/', methods=['GET'])
+def home():
+    return app.send_static_file('index.html')
+
+@app.route('/api', methods=['GET'])
+def api():
+    parameters = request.args
+
+    try:
+        subj = parameters["subjNo"]
+        no = parameters["classNo"]
+        userId = parameters["userId"]
+        userPw = parameters["userPw"]
+        year = parameters["year"]
+        semester = parameters["semester"]
+    except KeyError:
+        errMsg = {
+            "errCode": 11,
+            "message": "필수 인자가 전달되어야 합니다."
+        }
+        return jsonify(errMsg), 400
+
+    try:
         catApi = catlog()
-        catApi.login(userId, userPw)
+        catApi.login(userId,userPw)
+    except:
+        errMsg = {
+            "errCode": 20,
+            "message": "트리니티 정보 조회에 실패하였습니다."
+        }
+        return jsonify(errMsg), 400
+
+    try:
         jsonData = catApi.get_json(year, semester)
         now, limit, className = catApi.find(subj, no, jsonData)
         resMsg = {
@@ -96,12 +143,14 @@ def get_class_students():
             "className": className
         }
         return jsonify(resMsg)
-    except Exception as e:
+    except:
         errMsg = {
             "errCode": 21,
-            "message": f"트리니티 정보 조회에 실패하였습니다: {str(e)}"
+            "message": "트리니티 정보 조회에 실패하였습니다."
         }
         return jsonify(errMsg), 400
 
+print("End")
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=8080)
