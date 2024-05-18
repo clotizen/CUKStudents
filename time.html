@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Server Time Display</title>
+</head>
+<body>
+    <div id="serverTime">Loading server time...</div>
+    <script>
+        async function fetchServerTime() {
+            try {
+                const response = await fetch('/api/time');  // 로컬 API 엔드포인트 사용
+                const data = await response.json();
+                document.getElementById('serverTime').innerHTML = "Server time is: " + data.serverTime;
+            } catch (error) {
+                console.error('Failed to fetch server time:', error);
+                document.getElementById('serverTime').innerHTML = "Failed to load server time.";
+            }
+        }
+        setInterval(fetchServerTime, 1000);
+    </script>
+</body>
+</html>

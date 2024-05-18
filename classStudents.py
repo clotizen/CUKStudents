@@ -106,6 +106,28 @@ class catlog():
 def home():
     return app.send_static_file('index.html')
 
+@app.route('/time', methods=['GET'])
+def home2():
+    return app.send_static_file('time.html')
+
+from datetime import datetime
+import pytz
+
+@app.route('/api/time')
+def get_time():
+    response = requests.get('https://uportal.catholic.ac.kr/sso/jsp/sso/ip/login_form.jsp')
+    server_time = response.headers.get('Date', None)
+    if server_time:
+        # 서버 시간을 datetime 객체로 파싱
+        utc_time = datetime.strptime(server_time, '%a, %d %b %Y %H:%M:%S GMT')
+        # UTC 시간을 한국 시간(KST, UTC+9)으로 변환
+        korea_time_zone = pytz.timezone('Asia/Seoul')
+        korea_time = utc_time.replace(tzinfo=pytz.utc).astimezone(korea_time_zone)
+        formatted_time = korea_time.strftime('%Y-%m-%d %H:%M:%S')
+        return jsonify({'serverTime': formatted_time})
+    else:
+        return jsonify({'serverTime': '시간 정보를 가져오는데 실패했습니다.'})
+
 @app.route('/api', methods=['GET'])
 def api():
     parameters = request.args
